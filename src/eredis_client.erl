@@ -309,6 +309,8 @@ connect(State) ->
     case gen_tcp:connect(Addr, Port,
                          [AFamily | ?SOCKET_OPTS], State#state.connect_timeout) of
         {ok, Socket} ->
+            io:format("================ deb ~p~n", [State#state.password]),
+            io:format("================ db : ~p~n", [State#state.database]),
             case authenticate(Socket, State#state.password) of
                 ok ->
                     case select_database(Socket, State#state.database) of
@@ -318,9 +320,11 @@ connect(State) ->
                             {error, {select_error, Reason}}
                     end;
                 {error, Reason} ->
+                    io:format("================ authentication_error : ~p~n", [Reason]),
                     {error, {authentication_error, Reason}}
             end;
         {error, Reason} ->
+            io:format("================ connection_error : ~p~n", [Reason]),
             {error, {connection_error, Reason}}
     end.
 
@@ -356,18 +360,23 @@ authenticate(Socket, Password) ->
 %% @doc: Executes the given command synchronously, expects Redis to
 %% return "+OK\r\n", otherwise it will fail.
 do_sync_command(Socket, Command) ->
+    io:format("================ do_sync_command : ~p~n", [Command]),
     ok = inet:setopts(Socket, [{active, false}]),
     case gen_tcp:send(Socket, Command) of
         ok ->
+            io:format("================ do_sync_command ok"),
             %% Hope there's nothing else coming down on the socket..
             case gen_tcp:recv(Socket, 0, ?RECV_TIMEOUT) of
                 {ok, <<"+OK\r\n">>} ->
+                    io:format("================ receiving ok~n"),
                     ok = inet:setopts(Socket, [{active, once}]),
                     ok;
                 Other ->
+                    io:format("================ receiving error : ~p~n", [Other]),
                     {error, {unexpected_data, Other}}
             end;
         {error, Reason} ->
+            io:format("================ do_sync_command error : ~p~n", [Reason]),
             {error, Reason}
     end.
 
